@@ -4,7 +4,8 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # Database
-    database_url: str
+    database_url: str = ""
+    database_enabled: bool = True
 
     # NVIDIA NIM
     vista3d_nim_url: str
@@ -31,6 +32,15 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
     log_level: str = "INFO"
+    segmentation_enabled: bool = True
+    prediction_enabled: bool = True
+    segmentation_backend: str = "vista3d"  # "vista3d" or "lungmask"
+
+    # LLM explanation (optional)
+    explanation_enabled: bool = False
+    nim_api_key: str = ""
+    nim_model: str = "meta/llama-3.1-8b-instruct"
+    nim_base_url: str = "https://integrate.api.nvidia.com/v1/"
 
     class Config:
         env_file = ".env"

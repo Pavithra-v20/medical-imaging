@@ -64,25 +64,35 @@ st.sidebar.divider()
 st.sidebar.info("The agent uses NVIDIA VISTA-3D for segmentation and CT-CHAT for prediction.")
 
 # --- Main: File Upload & Viewer ---
-uploaded_file = st.file_uploader("Choose a DICOM file (.dcm)", type=["dcm"])
+uploaded_file = st.file_uploader(
+    "Choose a DICOM file or image",
+    type=["dcm", "zip", "png", "jpg", "jpeg", "webp"]
+)
 
 if uploaded_file is not None:
     # Read bytes once
     dicom_bytes = uploaded_file.getvalue()
     
-    # Display the DICOM image
-    st.subheader("DICOM Preview")
-    image_to_display = dicom_to_image(dicom_bytes)
-    
-    if image_to_display is not None:
-        st.image(image_to_display, caption=f"DICOM Preview for {uploaded_file.name}", use_column_width=True)
+    # Display preview
+    file_ext = uploaded_file.name.split(".")[-1].lower()
+    if file_ext in ["png", "jpg", "jpeg", "webp"]:
+        st.subheader("Image Preview")
+        st.image(dicom_bytes, caption=f"Preview for {uploaded_file.name}", use_column_width=True)
+    else:
+        st.subheader("DICOM Preview")
+        image_to_display = dicom_to_image(dicom_bytes)
+
+        if image_to_display is not None:
+            st.image(image_to_display, caption=f"DICOM Preview for {uploaded_file.name}", use_column_width=True)
 
     st.divider()
 
-    if st.button("🚀 Run AI Pipeline"):
+    if st.button("?? Run AI Pipeline"):
+        result = None
+        error_msg = None
         with st.status("Processing scan...", expanded=True) as status:
-            st.write("📤 Uploading to agent...")
-            
+            st.write("?? Uploading to agent...")
+
             # Prepare request
             files = {"file": (uploaded_file.name, dicom_bytes, "application/dicom")}
             data = {
@@ -90,55 +100,58 @@ if uploaded_file is not None:
                 "patient_id": patient_id,
                 "physician_id": physician_id
             }
-            
+
             try:
                 start_time = time.time()
-                response = requests.post(f"{API_URL}/predict", data=data, files=files, timeout=300) # Added timeout
+                response = requests.post(f"{API_URL}/predict", data=data, files=files, timeout=300)
                 duration = time.time() - start_time
-                
+
                 if response.status_code == 200:
                     status.update(label=f"Analysis Complete ({duration:.1f}s)", state="complete", expanded=False)
                     result = response.json()
-                    
-                    # --- Results Display ---
-                    st.divider()
-                    
-                    col1, col2 = st.columns([2, 1])
-                    
-                    with col1:
-                        st.subheader("📝 Summary")
-                        st.info(result["summary"])
-                        
-                        st.subheader("📋 Radiology Report")
-                        st.text_area("Findings & Impression", value=result["report"], height=300)
-                    
-                    with col2:
-                        st.subheader("🔬 AI Prediction")
-                        pred = result["prediction"]
-                        
-                        # Metrics
-                        st.metric("Disease Label", pred.get("disease_label", "N/A").title())
-                        st.metric("Confidence", f"{pred.get('confidence', 0)*100:.1f}%")
-                        
-                        # Review Requirement
-                        if result["rev_req"]:
-                            st.warning("⚠️ Physician Review Required")
-                        else:
-                            st.success("✅ Confidence Threshold Met")
-                            
-                        with st.expander("Clinical Reasoning"):
-                            st.write(pred.get("reasoning", "No reasoning provided."))
-                        
-                        st.caption(f"Session ID: {result['session_id']}")
-                        st.caption(f"Model: {pred.get('model_used', 'N/A')}")
-
                 else:
                     status.update(label="Error in Pipeline", state="error")
-                    st.error(f"Agent returned error {response.status_code}: {response.text}")
-                    
+                    error_msg = f"Agent returned error {response.status_code}: {response.text}"
             except requests.exceptions.RequestException as e:
                 status.update(label="Connection Failed", state="error")
-                st.error(f"Could not connect to Agent at {API_URL}. Is the FastAPI server running? Details: {e}")
+                error_msg = f"Could not connect to Agent at {API_URL}. Is the FastAPI server running? Details: {e}"
+
+        if error_msg:
+            st.error(error_msg)
+
+        if result:
+            # --- Results Display ---
+            st.divider()
+
+            col1, col2 = st.columns([2, 1])
+
+            with col1:
+                st.subheader("?? Summary")
+                st.info(result["summary"])
+
+                st.subheader("?? Radiology Report")
+                st.text_area("Findings & Impression", value=result["report"], height=300)
+
+            with col2:
+                st.subheader("?? AI Prediction")
+                pred = result["prediction"]
+
+                # Metrics
+                st.metric("Disease Label", pred.get("disease_label", "N/A").title())
+                st.metric("Confidence", f"{pred.get('confidence', 0)*100:.1f}%")
+
+                # Review Requirement
+                if result["rev_req"]:
+                    st.warning("?? Physician Review Required")
+                else:
+                    st.success("? Confidence Threshold Met")
+
+                with st.expander("Clinical Reasoning"):
+                    st.write(pred.get("reasoning", "No reasoning provided."))
+
+                st.caption(f"Session ID: {result['session_id']}")
+                st.caption(f"Model: {pred.get('model_used', 'N/A')}")
+
 
 else:
     st.info("Please upload a DICOM file to begin.")

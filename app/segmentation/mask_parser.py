@@ -116,3 +116,112 @@ def parse_masks(mask: np.ndarray, volume: np.ndarray) -> dict:
     )
 
     return result
+
+
+def parse_lungmask_masks(mask: np.ndarray, spacing_xyz_mm: tuple[float, float, float]) -> dict:
+    """
+    Parse Lungmask output (labels: 1=right lung, 2=left lung) into mask metrics.
+    spacing_xyz_mm is in (x, y, z) order from the NIfTI header.
+    """
+    # Convert spacing to match mask array axes (z, y, x)
+    voxel_spacing_mm = np.array([spacing_xyz_mm[2], spacing_xyz_mm[1], spacing_xyz_mm[0]])
+    voxel_volume_cm3 = float(np.prod(voxel_spacing_mm) / 1000.0)
+
+    label_map = {
+        1: "right_lung",
+        2: "left_lung",
+    }
+
+    findings = []
+    present_labels = np.unique(mask)
+    present_labels = present_labels[present_labels != 0]
+
+    for label_id in present_labels:
+        label_id = int(label_id)
+        class_name = label_map.get(label_id, f"unknown_class_{label_id}")
+        binary_mask = (mask == label_id).astype(np.uint8)
+
+        voxel_count = int(binary_mask.sum())
+        volume_cm3 = round(voxel_count * voxel_volume_cm3, 2)
+
+        centroid = ndimage.center_of_mass(binary_mask)
+        centroid_voxel = [int(c) for c in centroid]
+
+        coords = np.argwhere(binary_mask)
+        bbox_min = coords.min(axis=0)
+        bbox_max = coords.max(axis=0)
+        bbox_size_mm = (bbox_max - bbox_min) * voxel_spacing_mm
+        size_mm = round(float(bbox_size_mm.max()), 2)
+
+        finding = {
+            "label_id": label_id,
+            "structure_class": class_name,
+            "is_lesion": False,
+            "voxel_count": voxel_count,
+            "volume_cm3": volume_cm3,
+            "size_mm": size_mm,
+            "location_voxel": centroid_voxel,
+            "num_instances": 1,
+            "bbox_min": bbox_min.tolist(),
+            "bbox_max": bbox_max.tolist(),
+        }
+        findings.append(finding)
+
+    result = {
+        "findings": findings,
+        "lesion_findings": [],
+        "organ_count": len(findings),
+        "lesion_count": 0,
+        "max_lesion_size_mm": 0.0,
+        "has_critical_lesion": False,
+        "has_suspicious_lesion": False,
+    }
+
+    logger.info(
+        "lungmask_parsed",
+        organ_count=result["organ_count"],
+        lesion_count=result["lesion_count"],
+    )
+
+    return result
+
+
+def parse_image_mask(mask: np.ndarray, metrics: dict) -> dict:
+    """
+    Parse a 2D image mask into the common mask_metrics structure.
+    We treat a sufficiently large foreground region as a single "lesion".
+    """
+    area_ratio = metrics.get("area_ratio", 0.0)
+    has_lesion = area_ratio >= 0.02
+
+    findings = []
+    lesion_findings = []
+    if has_lesion:
+        lesion = {
+            "label_id": 1,
+            "structure_class": "image_region",
+            "is_lesion": True,
+            "voxel_count": int(mask.sum()),
+            "volume_cm3": 0.0,
+            "size_mm": float(metrics.get("size_px", 0.0)),
+            "location_voxel": metrics.get("centroid", [0, 0]),
+            "num_instances": 1,
+            "bbox_min": metrics.get("bbox_min", [0, 0]),
+            "bbox_max": metrics.get("bbox_max", [0, 0]),
+        }
+        lesion_findings.append(lesion)
+        findings.append(lesion)
+
+    result = {
+        "findings": findings,
+        "lesion_findings": lesion_findings,
+        "organ_count": 0,
+        "lesion_count": 1 if has_lesion else 0,
+        "max_lesion_size_mm": float(metrics.get("size_px", 0.0)) if has_lesion else 0.0,
+        "has_critical_lesion": False,
+        "has_suspicious_lesion": has_lesion,
+        "segmentation_method": "Otsu threshold (2D image)",
+    }
+
+    logger.info("image_mask_parsed", lesion_count=result["lesion_count"], area_ratio=area_ratio)
+    return result

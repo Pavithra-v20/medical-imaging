@@ -12,12 +12,19 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 settings = get_settings()
 
-# We need a sync URL for sqlalchemy-utils and initial table creation
-sync_url = settings.database_url.replace("asyncpg", "psycopg2")
-engine_sync = create_engine(sync_url)
-
-engine = create_async_engine(settings.database_url, echo=False, future=True)
-AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+if settings.database_enabled:
+    if not settings.database_url:
+        raise ValueError("DATABASE_URL must be set when DATABASE_ENABLED=true")
+    # We need a sync URL for sqlalchemy-utils and initial table creation
+    sync_url = settings.database_url.replace("asyncpg", "psycopg2")
+    engine_sync = create_engine(sync_url)
+    engine = create_async_engine(settings.database_url, echo=False, future=True)
+    AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+else:
+    sync_url = None
+    engine_sync = None
+    engine = None
+    AsyncSessionLocal = None
 
 
 async def init_db():
@@ -26,6 +33,9 @@ async def init_db():
     Uses a sync connection for DB/Table creation as it is more reliable for 
     DDL operations in Postgres.
     """
+    if not settings.database_enabled:
+        logger.info("database_disabled")
+        return
     try:
         if not database_exists(sync_url):
             create_database(sync_url)
@@ -56,6 +66,9 @@ async def log_session(
     The 'output' dict is serialized to JSON text for storage.
     Raises DatabaseError on failure so the caller can handle it.
     """
+    if not settings.database_enabled:
+        logger.info("database_disabled_skip_log", session_id=session_id)
+        return
     record = SessionModel(
         session_id=session_id,
         technician_id=technician_id,

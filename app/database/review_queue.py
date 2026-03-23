@@ -3,11 +3,13 @@ from sqlalchemy import Table, Column, String, DateTime, Text, MetaData
 from datetime import datetime, timezone
 
 from app.database.session_logger import AsyncSessionLocal, engine
+from app.config import get_settings
 from app.utils.exceptions import DatabaseError
 from app.utils.logger import get_logger
 import json
 
 logger = get_logger(__name__)
+settings = get_settings()
 
 metadata = MetaData()
 
@@ -27,6 +29,9 @@ review_queue_table = Table(
 
 async def init_review_queue():
     """Create review_queue table if it does not exist."""
+    if not settings.database_enabled:
+        logger.info("database_disabled_skip_review_queue_init")
+        return
     async with engine.begin() as conn:
         await conn.run_sync(metadata.create_all)
 
@@ -43,6 +48,9 @@ async def push_to_review_queue(
     Status starts as 'pending' and is updated to 'reviewed' by the
     physician portal when they sign off.
     """
+    if not settings.database_enabled:
+        logger.info("database_disabled_skip_review_queue", session_id=session_id)
+        return
     import uuid
     queue_id = str(uuid.uuid4())
 

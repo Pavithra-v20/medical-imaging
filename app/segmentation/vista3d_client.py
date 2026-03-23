@@ -34,14 +34,26 @@ async def run_segmentation(nifti_url: str, session_id: str, prompts: dict = None
     # Fix 3: Resolve path for local vs remote NIM
     nifti_url = resolve_nim_path(nifti_url, settings)
     
-    # Use the new inference endpoint structure
-    endpoint_suffix = "/vista3d/inference"
+    # Build the inference URL for hosted vs self-hosted NIM
     base_url = settings.vista3d_nim_url.rstrip("/")
-    
-    if endpoint_suffix in base_url:
-        inference_url = base_url
+    if "health.api.nvidia.com" in base_url:
+        # Hosted NIM API uses a different path
+        if base_url.endswith("/medicalimaging/nvidia/vista-3d"):
+            inference_url = base_url
+        elif base_url.endswith("/v1"):
+            inference_url = f"{base_url}/medicalimaging/nvidia/vista-3d"
+        else:
+            inference_url = base_url
     else:
-        inference_url = f"{base_url}{endpoint_suffix}"
+        # Self-hosted NIM default path
+        if base_url.endswith("/inference"):
+            inference_url = base_url
+        elif base_url.endswith("/vista3d"):
+            inference_url = f"{base_url}/inference"
+        elif base_url.endswith("/v1"):
+            inference_url = f"{base_url}/vista3d/inference"
+        else:
+            inference_url = f"{base_url}/v1/vista3d/inference"
     
     payload = {
         "image": nifti_url,

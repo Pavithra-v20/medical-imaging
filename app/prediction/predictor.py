@@ -34,7 +34,34 @@ async def predict_disease(mask_metrics: dict, volume: np.ndarray) -> dict:
     model = settings.prediction_model.lower()
     logger.info("prediction_started", model=model, lesion_count=mask_metrics["lesion_count"])
 
-    if model == "ctchat":
+    if not settings.prediction_enabled:
+        logger.info("prediction_disabled")
+        result = {
+            "disease_label": "Unknown",
+            "confidence": 0.0,
+            "reasoning": "Prediction disabled for local development.",
+            "model_used": "disabled",
+            "raw_response": "",
+        }
+    elif model == "local_rules":
+        lesion_count = mask_metrics.get("lesion_count", 0)
+        if lesion_count > 0:
+            result = {
+                "disease_label": "Abnormality Detected",
+                "confidence": 0.7,
+                "reasoning": "Local heuristic based on segmentation findings.",
+                "model_used": "local_rules",
+                "raw_response": "",
+            }
+        else:
+            result = {
+                "disease_label": "No Abnormality Detected",
+                "confidence": 0.6,
+                "reasoning": "Local heuristic based on segmentation findings.",
+                "model_used": "local_rules",
+                "raw_response": "",
+            }
+    elif model == "ctchat":
         result = await call_ct_chat(prediction_payload)
     elif model == "medgemma":
         try:

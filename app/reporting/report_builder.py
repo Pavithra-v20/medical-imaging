@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 from app.utils.logger import get_logger
+from app.config import get_settings
 
 logger = get_logger(__name__)
+settings = get_settings()
 
 
 def build_report(prediction: dict, mask_metrics: dict, session_id: str) -> str:
@@ -54,6 +56,13 @@ def build_report(prediction: dict, mask_metrics: dict, session_id: str) -> str:
 
     findings_text = "\n".join(findings_lines)
 
+    if mask_metrics.get("segmentation_method"):
+        seg_method = mask_metrics["segmentation_method"]
+    elif settings.segmentation_backend.lower() == "lungmask":
+        seg_method = "Lungmask (local, lightweight lung segmentation)"
+    else:
+        seg_method = "NVIDIA VISTA-3D (127-class model)"
+
     report = f"""CT DISEASE ANALYSIS REPORT
 ==========================
 Session ID : {session_id}
@@ -66,7 +75,7 @@ CT scan (3D volumetric, DICOM input)
 
 TECHNIQUE
 ---------
-Automated segmentation performed using NVIDIA VISTA-3D (127-class model).
+Automated segmentation performed using {seg_method}.
 Disease prediction performed using {model_used.upper()}.
 
 FINDINGS
