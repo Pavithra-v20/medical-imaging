@@ -2,10 +2,6 @@ import streamlit as st
 import requests
 import json
 import time
-import pydicom
-import numpy as np
-import io
-from fpdf import FPDF
 
 # --- Configuration ---
 API_URL = "http://127.0.0.1:8080"
@@ -15,58 +11,6 @@ st.set_page_config(
     page_icon="🏥",
     layout="wide"
 )
-
-# --- DICOM Viewer Function ---
-
-# --- Report ? PDF ---
-
-def _report_to_pdf(report_text: str, title: str = "Patient Report") -> bytes:
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
-    pdf.set_font("Helvetica", size=12)
-
-    pdf.set_font("Helvetica", style="B", size=14)
-    pdf.cell(0, 10, title, ln=True)
-    pdf.set_font("Helvetica", size=11)
-
-    for line in report_text.splitlines():
-        if not line.strip():
-            pdf.ln(4)
-            continue
-        pdf.multi_cell(0, 6, line)
-
-    return pdf.output(dest="S").encode("latin-1")
-def dicom_to_image(file_bytes, window_center=40, window_width=400):
-    """
-    Parses DICOM bytes and converts pixel data to a displayable image.
-    Applies a windowing function to map raw pixel values to grayscale.
-    """
-    try:
-        ds = pydicom.dcmread(io.BytesIO(file_bytes))
-        
-        # Get pixel array
-        pixel_array = ds.pixel_array.astype(float)
-        
-        # Apply Rescale Slope and Intercept if they exist
-        if 'RescaleSlope' in ds and 'RescaleIntercept' in ds:
-            pixel_array = pixel_array * ds.RescaleSlope + ds.RescaleIntercept
-            
-        # Apply windowing
-        lower_bound = window_center - (window_width / 2)
-        upper_bound = window_center + (window_width / 2)
-        
-        pixel_array[pixel_array < lower_bound] = lower_bound
-        pixel_array[pixel_array > upper_bound] = upper_bound
-        
-        # Normalize to 0-255
-        image_2d = (pixel_array - lower_bound) / (upper_bound - lower_bound)
-        image_2d_scaled = (image_2d * 255.0).astype(np.uint8)
-        
-        return image_2d_scaled
-    except Exception as e:
-        st.error(f"Failed to parse DICOM file: {e}")
-        return None
 
 # --- UI ---
 st.title("🏥 CT Disease Agent")
@@ -86,8 +30,8 @@ st.sidebar.info("The agent uses NVIDIA VISTA-3D for segmentation and CT-CHAT for
 
 # --- Main: File Upload & Viewer ---
 uploaded_file = st.file_uploader(
-    "Choose a DICOM file or image",
-    type=["dcm", "zip", "png", "jpg", "jpeg", "webp"]
+    "Choose an image",
+    type=["png", "jpg", "jpeg", "webp"]
 )
 
 if uploaded_file is not None:
@@ -95,16 +39,8 @@ if uploaded_file is not None:
     dicom_bytes = uploaded_file.getvalue()
     
     # Display preview
-    file_ext = uploaded_file.name.split(".")[-1].lower()
-    if file_ext in ["png", "jpg", "jpeg", "webp"]:
-        st.subheader("Image Preview")
-        st.image(dicom_bytes, caption=f"Preview for {uploaded_file.name}", use_column_width=True)
-    else:
-        st.subheader("DICOM Preview")
-        image_to_display = dicom_to_image(dicom_bytes)
-
-        if image_to_display is not None:
-            st.image(image_to_display, caption=f"DICOM Preview for {uploaded_file.name}", use_column_width=True)
+    st.subheader("Image Preview")
+    st.image(dicom_bytes, caption=f"Preview for {uploaded_file.name}", use_column_width=True)
 
     st.divider()
 
@@ -150,17 +86,6 @@ if uploaded_file is not None:
                 st.subheader("?? Summary")
                 st.info(result["summary"])
 
-                if result.get("report"):
-                    st.subheader("?? Radiology Report")
-                    st.text_area("Findings & Impression", value=result["report"], height=300)
-
-                    pdf_bytes = _report_to_pdf(result["report"], title="Patient Report")
-                    st.download_button(
-                        label="Download Report PDF",
-                        data=pdf_bytes,
-                        file_name=f"report_{result['session_id']}.pdf",
-                        mime="application/pdf",
-                    )
 
             with col2:
                 st.subheader("?? AI Prediction")

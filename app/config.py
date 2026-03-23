@@ -7,18 +7,8 @@ class Settings(BaseSettings):
     database_url: str = ""
     database_enabled: bool = True
 
-    # NVIDIA NIM
-    vista3d_nim_url: str
-    nvidia_api_key: str
-
-    # Triton
-    triton_url: str = "localhost:8000"
-
     # Prediction models
-    ctchat_url: str
-    medgemma_url: str
-    google_api_key: str = ""
-    prediction_model: str = "ctchat"  # "ctchat", "medgemma", "local_rules", "xray", "mr"
+    prediction_model: str = "mr"  # "local_rules" or "mr"
 
     # Local MR classifier
     mr_model_path: str = ""
@@ -36,11 +26,7 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
     log_level: str = "INFO"
-    segmentation_enabled: bool = True
     prediction_enabled: bool = True
-    segmentation_backend: str = "vista3d"  # "vista3d", "lungmask", or "totalseg_konfai"
-    totalseg_task: str = "total_3mm"
-    totalseg_cpu: int = 2
 
     # LLM explanation (optional)
     explanation_enabled: bool = False
@@ -48,10 +34,6 @@ class Settings(BaseSettings):
     nim_model: str = "meta/llama-3.1-8b-instruct"
     nim_base_url: str = "https://integrate.api.nvidia.com/v1/"
 
-    # Gemini report generation (optional)
-    report_enabled: bool = True
-    gemini_model: str = "gemini-1.5-flash-latest"
-    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/models"
 
     class Config:
         env_file = ".env"
