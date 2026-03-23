@@ -1,0 +1,50 @@
+[project]
+name = "medical-image"
+version = "2.0.0"
+description = "Explainable AI Medical Image Diagnostic System — Hackathon"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # FastAPI stack
+    "fastapi==0.111.0",
+    "uvicorn[standard]==0.29.0",
+    "python-multipart==0.0.9",
+    "pydantic==2.7.1",
+    "pydantic-settings==2.2.1",
+    # Database
+    "sqlalchemy==2.0.30",
+    "asyncpg==0.29.0",
+    "alembic==1.13.1",
+    "psycopg2-binary==2.9.9",
+    # AI / ML
+    "numpy==1.26.4",
+    "scipy==1.13.0",
+    "lungmask==0.2.20",
+    "SimpleITK==2.5.3",
+    "torch",
+    "Pillow==10.4.0",
+    "totalsegmentator-konfai",
+    "torchxrayvision",
+    "torchvision",
+    "fpdf2==2.7.9",
+    "tritonclient[http]==2.44.0",
+    # HTTP clients
+    "httpx==0.27.0",
+    # Utilities
+    "python-dotenv==1.0.1",
+    "structlog==24.1.0",
+    "tenacity==8.2.3",
+    "email-validator>=2.1.0",
+    # Google Gemini (latest)
+    "google-generativeai",
+    # Added missing dependencies from source codebase
+    "bcrypt",
+    "opencv-python",
+    "google-auth-oauthlib",
+    "google-api-python-client",
+    "python-jose[cryptography]",
+    "langgraph",
+    "reportlab",
+    "requests",
+    "tensorflow",
+]
