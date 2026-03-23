@@ -1,0 +1,10 @@
+# Ignore all log files
+*.log
+.env
+.env.example
+.venv
+__pycache__/
+*.pyc
+
+# Keep this file to ensure the directory is tracked by git
+!.gitignore
