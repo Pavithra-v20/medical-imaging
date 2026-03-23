@@ -55,4 +55,10 @@ def evaluate_rev_req(prediction: dict, mask_metrics: dict) -> bool:
             logger.info("rev_req_critical_label", label=disease_label)
             return True
 
+    # Rule 5: Suspicious keywords in reasoning
+    reasoning = prediction.get("reasoning", "").lower()
+    if any(k in reasoning for k in ["suspicious", "malignant", "suggestive of", "concerning"]):
+        logger.info("rev_req_suspicious_reasoning")
+        return True
+
     return False

@@ -18,29 +18,52 @@ Analyze the provided CT segmentation findings and return ONLY a JSON object with
 Respond with valid JSON only. No markdown, no preamble."""
 
 
+import base64
+import io
+import numpy as np
+from PIL import Image
+
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-async def call_medgemma(mask_metrics: dict) -> dict:
+async def call_medgemma(mask_metrics: dict, volume: np.ndarray | None = None) -> dict:
     """
-    Send segmentation findings to MedGemma 1.5 for disease prediction.
-
-    MedGemma 1.5 is Google's medical multimodal model supporting CT, MRI,
-    dermatology, and more. Used as an alternative to CT-CHAT for broader
-    multi-disease coverage.
-
-    Returns a dict with disease_label, confidence, reasoning.
+    Send segmentation findings and a representative CT slice to MedGemma 1.5.
     """
     user_content = f"""CT segmentation findings:
 {json.dumps(mask_metrics, indent=2)}
 
-Based on these findings, provide your primary diagnosis."""
+Based on these findings and the provided image, provide your primary diagnosis."""
+
+    parts = [{"text": SYSTEM_PROMPT + "\n\n" + user_content}]
+
+    if volume is not None and isinstance(volume, np.ndarray) and volume.ndim == 3:
+        # Extract middle slice as representative
+        mid_idx = volume.shape[0] // 2
+        slice_arr = volume[mid_idx]
+        
+        # Normalize to 0-255 for PNG
+        vmin, vmax = slice_arr.min(), slice_arr.max()
+        if vmax > vmin:
+            slice_arr = ((slice_arr - vmin) / (vmax - vmin) * 255).astype(np.uint8)
+        else:
+            slice_arr = slice_arr.astype(np.uint8)
+            
+        img = Image.fromarray(slice_arr)
+        img_byte_arr = io.BytesIO()
+        img.save(img_byte_arr, format='PNG')
+        img_b64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+        
+        parts.append({
+            "inline_data": {
+                "mime_type": "image/png",
+                "data": img_b64
+            }
+        })
 
     payload = {
         "contents": [
             {
                 "role": "user",
-                "parts": [
-                    {"text": SYSTEM_PROMPT + "\n\n" + user_content}
-                ],
+                "parts": parts,
             }
         ],
         "generationConfig": {

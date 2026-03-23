@@ -225,3 +225,60 @@ def parse_image_mask(mask: np.ndarray, metrics: dict) -> dict:
 
     logger.info("image_mask_parsed", lesion_count=result["lesion_count"], area_ratio=area_ratio)
     return result
+
+
+def parse_totalseg_masks(mask: np.ndarray) -> dict:
+    """
+    Parse TotalSegmentator labelmap into generic mask metrics.
+    Labels are mapped to organ_<id> when names are unavailable.
+    """
+    voxel_spacing_mm = np.array([1.5, 1.5, 1.5])
+    voxel_volume_cm3 = float(np.prod(voxel_spacing_mm) / 1000.0)
+
+    findings = []
+    present_labels = np.unique(mask)
+    present_labels = present_labels[present_labels != 0]
+
+    for label_id in present_labels:
+        label_id = int(label_id)
+        class_name = f"organ_{label_id}"
+        binary_mask = (mask == label_id).astype(np.uint8)
+
+        voxel_count = int(binary_mask.sum())
+        volume_cm3 = round(voxel_count * voxel_volume_cm3, 2)
+        centroid = ndimage.center_of_mass(binary_mask)
+        centroid_voxel = [int(c) for c in centroid]
+
+        coords = np.argwhere(binary_mask)
+        bbox_min = coords.min(axis=0)
+        bbox_max = coords.max(axis=0)
+        bbox_size_mm = (bbox_max - bbox_min) * voxel_spacing_mm
+        size_mm = round(float(bbox_size_mm.max()), 2)
+
+        finding = {
+            "label_id": label_id,
+            "structure_class": class_name,
+            "is_lesion": False,
+            "voxel_count": voxel_count,
+            "volume_cm3": volume_cm3,
+            "size_mm": size_mm,
+            "location_voxel": centroid_voxel,
+            "num_instances": 1,
+            "bbox_min": bbox_min.tolist(),
+            "bbox_max": bbox_max.tolist(),
+        }
+        findings.append(finding)
+
+    result = {
+        "findings": findings,
+        "lesion_findings": [],
+        "organ_count": len(findings),
+        "lesion_count": 0,
+        "max_lesion_size_mm": 0.0,
+        "has_critical_lesion": False,
+        "has_suspicious_lesion": False,
+        "segmentation_method": "TotalSegmentator (konfai, CPU)",
+    }
+
+    logger.info("totalseg_parsed", organ_count=result["organ_count"])
+    return result

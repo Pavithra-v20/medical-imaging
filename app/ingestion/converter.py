@@ -5,6 +5,8 @@ from pathlib import Path
 from app.utils.exceptions import IngestionError
 from app.utils.logger import get_logger
 
+import SimpleITK as sitk
+
 logger = get_logger(__name__)
 
 
@@ -48,6 +50,7 @@ def convert_series_to_nifti(
     """
     Stack a sorted list of DICOM slices into a 3D NIfTI volume.
     Applies rescale slope/intercept from the first slice.
+    (Legacy path; prefer convert_dicom_dir_to_nifti for better spacing/orientation.)
     """
     if not slices:
         raise IngestionError("No slices provided for NIfTI conversion")
@@ -79,4 +82,39 @@ def convert_series_to_nifti(
     nib.save(nifti_img, str(nifti_path))
     logger.info("series_nifti_saved", path=str(nifti_path), shape=volume.shape)
 
+    return nifti_path
+
+
+def convert_dicom_dir_to_nifti(
+    dicom_dir: Path,
+    output_dir: str,
+    session_id: str,
+    hu_window: tuple[int, int] = (-1000, 400),
+) -> Path:
+    """
+    Convert a DICOM series directory to NIfTI using SimpleITK to preserve
+    spacing and orientation. Applies optional HU windowing.
+    """
+    try:
+        reader = sitk.ImageSeriesReader()
+        series_ids = reader.GetGDCMSeriesIDs(str(dicom_dir))
+        if not series_ids:
+            raise IngestionError(f"No DICOM series found in {dicom_dir}")
+
+        series_files = reader.GetGDCMSeriesFileNames(str(dicom_dir), series_ids[0])
+        reader.SetFileNames(series_files)
+        image = reader.Execute()
+    except Exception as e:
+        raise IngestionError(f"Failed to read DICOM series with SimpleITK: {e}")
+
+    if hu_window:
+        low, high = hu_window
+        image = sitk.Clamp(image, lowerBound=low, upperBound=high)
+
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    nifti_path = output_path / f"{session_id}.nii.gz"
+
+    sitk.WriteImage(image, str(nifti_path))
+    logger.info("series_nifti_saved_sitk", path=str(nifti_path), window=hu_window)
     return nifti_path

@@ -35,6 +35,17 @@ def load_dicom(dicom_path: Path) -> pydicom.Dataset:
     return ds
 
 
+def extract_metadata(ds: pydicom.Dataset) -> dict:
+    """
+    Extract relevant clinical metadata from a DICOM dataset.
+    """
+    return {
+        "patient_age": getattr(ds, "PatientAge", None),
+        "patient_sex": getattr(ds, "PatientSex", None),
+        "study_description": getattr(ds, "StudyDescription", None),
+    }
+
+
 def load_dicom_series(dicom_dir: Path) -> list[pydicom.Dataset]:
     """
     Read all DICOM files in a directory and return a sorted list of datasets.
@@ -56,8 +67,14 @@ def load_dicom_series(dicom_dir: Path) -> list[pydicom.Dataset]:
     if not datasets:
         raise IngestionError(f"No valid CT DICOM files found in {dicom_dir}")
 
-    # Sort by SliceLocation, fallback to InstanceNumber
-    datasets.sort(key=lambda x: (float(getattr(x, "SliceLocation", 0)), int(getattr(x, "InstanceNumber", 0))))
+    # Sort by ImagePositionPatient (z), fallback to InstanceNumber, then SliceLocation
+    def _zpos(ds):
+        ipp = getattr(ds, "ImagePositionPatient", None)
+        if ipp and len(ipp) >= 3:
+            return float(ipp[2])
+        return float(getattr(ds, "SliceLocation", 0))
+
+    datasets.sort(key=lambda x: (_zpos(x), int(getattr(x, "InstanceNumber", 0))))
 
     logger.info("dicom_series_loaded", directory=str(dicom_dir), count=len(datasets))
     return datasets

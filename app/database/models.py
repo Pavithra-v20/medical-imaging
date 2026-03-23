@@ -47,6 +47,9 @@ class Session(Base):
         default=lambda: datetime.now(timezone.utc),
     )
     confidence = Column(Float, nullable=True, comment="Model prediction confidence 0-1")
+    patient_age = Column(String(16), nullable=True, comment="Extracted patient age")
+    patient_sex = Column(String(16), nullable=True, comment="Extracted patient sex")
+    study_description = Column(Text, nullable=True, comment="DICOM study description")
 
     def __repr__(self):
         return (

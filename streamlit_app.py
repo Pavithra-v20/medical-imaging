@@ -5,6 +5,7 @@ import time
 import pydicom
 import numpy as np
 import io
+from fpdf import FPDF
 
 # --- Configuration ---
 API_URL = "http://127.0.0.1:8080"
@@ -16,6 +17,26 @@ st.set_page_config(
 )
 
 # --- DICOM Viewer Function ---
+
+# --- Report ? PDF ---
+
+def _report_to_pdf(report_text: str, title: str = "Patient Report") -> bytes:
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=12)
+
+    pdf.set_font("Helvetica", style="B", size=14)
+    pdf.cell(0, 10, title, ln=True)
+    pdf.set_font("Helvetica", size=11)
+
+    for line in report_text.splitlines():
+        if not line.strip():
+            pdf.ln(4)
+            continue
+        pdf.multi_cell(0, 6, line)
+
+    return pdf.output(dest="S").encode("latin-1")
 def dicom_to_image(file_bytes, window_center=40, window_width=400):
     """
     Parses DICOM bytes and converts pixel data to a displayable image.
@@ -129,8 +150,17 @@ if uploaded_file is not None:
                 st.subheader("?? Summary")
                 st.info(result["summary"])
 
-                st.subheader("?? Radiology Report")
-                st.text_area("Findings & Impression", value=result["report"], height=300)
+                if result.get("report"):
+                    st.subheader("?? Radiology Report")
+                    st.text_area("Findings & Impression", value=result["report"], height=300)
+
+                    pdf_bytes = _report_to_pdf(result["report"], title="Patient Report")
+                    st.download_button(
+                        label="Download Report PDF",
+                        data=pdf_bytes,
+                        file_name=f"report_{result['session_id']}.pdf",
+                        mime="application/pdf",
+                    )
 
             with col2:
                 st.subheader("?? AI Prediction")

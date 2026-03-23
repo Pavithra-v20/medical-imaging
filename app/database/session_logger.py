@@ -57,9 +57,12 @@ async def log_session(
     input_path: str,
     output: dict,
     summary: str,
-    report: str,
+    report: str | None,
     physician_id: str,
     rev_req: bool,
+    patient_age: str | None = None,
+    patient_sex: str | None = None,
+    study_description: str | None = None,
 ) -> None:
     """
     Write one complete session record to the PostgreSQL sessions table.
@@ -80,6 +83,9 @@ async def log_session(
         physician_id=physician_id,
         rev_req=rev_req,
         confidence=output.get("confidence"),
+        patient_age=patient_age,
+        patient_sex=patient_sex,
+        study_description=study_description,
     )
 
     try:

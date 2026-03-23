@@ -14,6 +14,10 @@ lungmask==0.2.20
 SimpleITK==2.5.3
 torch
 Pillow==10.4.0
+totalsegmentator-konfai
+torchxrayvision
+torchvision
+fpdf2==2.7.9
 
 # Database
 sqlalchemy==2.0.30
