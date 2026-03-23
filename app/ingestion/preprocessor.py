@@ -28,6 +28,11 @@ def preprocess(nifti_path: Path) -> np.ndarray:
     # Normalize to [0, 1]
     volume = (volume - HU_MIN) / (HU_MAX - HU_MIN)
 
+    # Ensure 3D (D, H, W) before adding batch/channel
+    if volume.ndim == 2:
+        # Add a depth dimension: (H, W) → (1, H, W)
+        volume = volume[np.newaxis, ...]
+    
     # Add batch and channel dims: (D, H, W) → (1, 1, D, H, W)
     volume = volume[np.newaxis, np.newaxis, ...]
 

@@ -1,4 +1,6 @@
 import json
+from sqlalchemy import create_engine
+from sqlalchemy_utils import database_exists, create_database
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
@@ -10,14 +12,32 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 settings = get_settings()
 
+# We need a sync URL for sqlalchemy-utils and initial table creation
+sync_url = settings.database_url.replace("asyncpg", "psycopg2")
+engine_sync = create_engine(sync_url)
+
 engine = create_async_engine(settings.database_url, echo=False, future=True)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 async def init_db():
-    """Create all tables on startup if they don't exist."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """
+    Ensure the database exists and create all tables.
+    Uses a sync connection for DB/Table creation as it is more reliable for 
+    DDL operations in Postgres.
+    """
+    try:
+        if not database_exists(sync_url):
+            create_database(sync_url)
+            logger.info("database_created", url=sync_url)
+        
+        # Create tables if they don't exist
+        Base.metadata.create_all(engine_sync)
+        logger.info("database_tables_initialized")
+    except Exception as e:
+        logger.error("database_init_failed", error=str(e))
+        # We don't raise here to allow the app to attempt starting, 
+        # but subsequent DB calls will fail.
 
 
 async def log_session(

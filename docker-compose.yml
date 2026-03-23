@@ -41,5 +41,21 @@ services:
     volumes:
       - ./storage:/app/storage
 
+  vista3d:
+    image: nvcr.io/nim/nvidia/vista3d:1.0.0
+    ports:
+      - "8001:8000"
+    environment:
+      - NGC_API_KEY=${NVIDIA_API_KEY}
+    volumes:
+      - ./storage:/mnt/storage
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
 volumes:
   pg_data:
